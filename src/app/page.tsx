@@ -1,52 +1,151 @@
-import Image from "next/image";
+"use client";
+
+import { useState } from "react";
+
+const SunIcon = () => (
+  <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round">
+    <circle cx="10" cy="10" r="3.2" />
+    <path d="M10 2.3v1.6M10 16v1.6M17.7 10h-1.6M3.9 10H2.3M15.4 4.6l-1.2 1.2M5.8 14.2l-1.2 1.2M15.4 15.4l-1.2-1.2M5.8 5.8 4.6 4.6" />
+  </svg>
+);
+
+const MoonIcon = () => (
+  <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+    <path d="M16.5 12.3A7 7 0 0 1 7.7 3.5a7 7 0 1 0 8.8 8.8Z" />
+  </svg>
+);
+
+const FEATURES = [
+  { title: "Auto-reveal", body: "Cards flip the moment the last vote lands — no one has to ask “is everyone in?”" },
+  { title: "Consensus check", body: "Instant agreement gets called out; split votes highlight the high and low outliers to discuss first." },
+  { title: "Round history & export", body: "Every story and its final estimate stays logged for the session — copy it straight into your ticket." },
+  { title: "Spectator mode", body: "POs and stakeholders can watch without a vote skewing the average." },
+  { title: "Five deck types", body: "Fibonacci, modified Fibonacci, powers of two, sequential, or T-shirt sizes — pick per session." },
+  { title: "Keyboard voting", body: "Press 1–9 to throw a card without touching the mouse." },
+  { title: "Retro boards", body: "Went well, to improve, action items — same room code, same team." },
+  { title: "No signup, ever", body: "Share a six-character code and start pointing in seconds." },
+];
 
 export default function Home() {
-	return (
-		<div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-			<main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-				<Image className="dark:invert" src="/next.svg" alt="Next.js logo" width={180} height={38} priority />
-				<ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-					<li className="mb-2 tracking-[-.01em]">
-						Get started by editing{" "}
-						<code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-							src/app/page.tsx
-						</code>
-						.
-					</li>
-					<li className="tracking-[-.01em]">Save and see your changes instantly.</li>
-				</ol>
+  const [theme, setTheme] = useState<"dark" | "light">("dark");
 
-				<div className="flex gap-4 items-center flex-col sm:flex-row">
-					<a
-						className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-						href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-						target="_blank"
-						rel="noopener noreferrer"
-					>
-						Read our docs
-					</a>
-				</div>
-			</main>
-			<footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-				<a
-					className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-					href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-					target="_blank"
-					rel="noopener noreferrer"
-				>
-					<Image aria-hidden src="/file.svg" alt="File icon" width={16} height={16} />
-					Learn
-				</a>
-				<a
-					className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-					href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-					target="_blank"
-					rel="noopener noreferrer"
-				>
-					<Image aria-hidden src="/globe.svg" alt="Globe icon" width={16} height={16} />
-					Go to nextjs.org →
-				</a>
-			</footer>
-		</div>
-	);
+  const toggleTheme = () => {
+    const next = theme === "dark" ? "light" : "dark";
+    setTheme(next);
+    document.documentElement.dataset.theme = next;
+  };
+
+  return (
+    <div className="pp">
+      <div className="pp-topbar">
+        <div className="pp-brand">
+          <span className="pp-brand-suit">♠</span>Pointing Poker
+        </div>
+        <button className="pp-icon-btn" onClick={toggleTheme} title="Toggle theme" aria-label="Toggle theme">
+          {theme === "dark" ? <SunIcon /> : <MoonIcon />}
+        </button>
+      </div>
+
+      <div className="pp-inner">
+        {/* hero */}
+        <div className="pp-hero">
+          <div>
+            <p className="pp-eyebrow">Free · No signup · Real-time</p>
+            <h1>
+              Estimate together.
+              <br />
+              Ship with confidence.
+            </h1>
+            <p className="pp-hero-sub">
+              Planning poker for distributed dev teams. Deal a hand, reveal together, and turn debate
+              into a number everyone can stand behind — synced live across everyone with the room code.
+            </p>
+          </div>
+          <div className="pp-hero-stage" aria-hidden="true">
+            <div className="pp-fan-card f1" />
+            <div className="pp-fan-card f2" />
+            <div className="pp-fan-card f3" />
+            <div className="pp-fan-card f4" />
+            <div className="pp-flip-card">
+              <div className="pp-flip-face pp-back" />
+              <div className="pp-flip-face pp-front">8</div>
+            </div>
+          </div>
+        </div>
+
+        {/* create / join table */}
+        <div className="pp-table">
+          <div className="pp-panel">
+            <h2>Start a pointing session</h2>
+            <p className="pp-panel-sub">Deal a fresh table and invite your team.</p>
+            <label>Your name</label>
+            <input type="text" placeholder="e.g. Aizat" maxLength={24} />
+            <label>Story or ticket (optional)</label>
+            <input type="text" placeholder="e.g. JIRA-482 Refund flow" maxLength={80} />
+            <label>Estimation deck</label>
+            <select>
+              <option value="fibonacci">Fibonacci — 0 1 2 3 5 8 13 21 34 55 89</option>
+              <option value="modified">Modified Fibonacci — 0 ½ 1 2 3 5 8 13 20 40 100</option>
+              <option value="powers2">Powers of 2 — 0 1 2 4 8 16 32 64</option>
+              <option value="sequential">Sequential — 1 to 10</option>
+              <option value="tshirt">T-shirt sizes — XS S M L XL XXL</option>
+            </select>
+            <button className="pp-btn pp-btn-primary">Deal me in →</button>
+            <p className="pp-error" />
+          </div>
+          <div className="pp-seam" />
+          <div className="pp-panel">
+            <h2>Join a session</h2>
+            <p className="pp-panel-sub">Already got a table code from a teammate?</p>
+            <label>Your name</label>
+            <input type="text" placeholder="e.g. Aizat" maxLength={24} />
+            <label>Room code</label>
+            <input type="text" placeholder="e.g. 7F3KQ2" maxLength={8} style={{ textTransform: "uppercase" }} />
+            <button className="pp-btn pp-btn-outline">Join table →</button>
+            <p className="pp-error" />
+          </div>
+        </div>
+
+        {/* retro cta */}
+        <div className="pp-retro-cta">
+          <div>
+            <h2>Running a retro instead?</h2>
+            <p>
+              Spin up a three-column retro board — went well, to improve, action items — with the same
+              room-code flow.
+            </p>
+          </div>
+          <div className="pp-retro-actions">
+            <div className="flex flex-col gap-2">
+              <input type="text" placeholder="Your name" maxLength={24} />
+              <button className="pp-btn pp-btn-primary">Start a retro →</button>
+            </div>
+            <div className="flex flex-col gap-2">
+              <input type="text" placeholder="Room code" maxLength={8} />
+              <button className="pp-btn pp-btn-outline">Join</button>
+            </div>
+            
+            
+          </div>
+        </div>
+
+        {/* features */}
+        <div className="pp-features">
+          <h2>Built for how dev teams actually estimate</h2>
+          <div className="pp-feature-grid">
+            {FEATURES.map((f) => (
+              <div className="pp-feature" key={f.title}>
+                <h3>{f.title}</h3>
+                <p>{f.body}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="pp-footer">
+          <p>Pointing Poker — built for teams who&apos;d rather estimate than argue about estimating.</p>
+        </div>
+      </div>
+    </div>
+  );
 }
