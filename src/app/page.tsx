@@ -1,6 +1,9 @@
 "use client";
 
+import { randCode } from "@/lib/room";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { DeckType } from "../../party/server";
 
 const SunIcon = () => (
   <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round">
@@ -27,13 +30,51 @@ const FEATURES = [
 ];
 
 export default function Home() {
+  const router = useRouter();
   const [theme, setTheme] = useState<"dark" | "light">("dark");
+
+  const [createName, setCreateName] = useState("");
+  const [createTitle, setCreateTitle] = useState("");
+  const [createDeck, setCreateDeck] = useState<DeckType>("fibonacci");
+  const [createError, setCreateError] = useState("");
+
+  const [joinName, setJoinName] = useState("");
+  const [joinCode, setJoinCode] = useState("");
+  const [joinError, setJoinError] = useState("");
 
   const toggleTheme = () => {
     const next = theme === "dark" ? "light" : "dark";
     setTheme(next);
     document.documentElement.dataset.theme = next;
   };
+
+  const startSession = async () => {
+    if (!createName.trim()) {
+      setCreateError("Please enter your name");
+      return;
+    }
+
+    sessionStorage.setItem("pp:name", createName.trim());
+    sessionStorage.setItem("pp:deck", createDeck);
+
+    if (createTitle.trim()) sessionStorage.setItem("pp:story", createTitle.trim());
+    else sessionStorage.removeItem("pp:story");
+
+    router.push(`/room/${randCode()}`);
+  }
+
+  const joinSession = async () => {
+    const code = joinCode.trim().toUpperCase();
+    if (!joinName.trim() || !code) {
+      setJoinError("Please enter your name and room code");
+      return;
+    }
+
+    sessionStorage.setItem("pp:name", joinName.trim());
+    sessionStorage.removeItem("pp:deck");
+    sessionStorage.removeItem("pp:story");
+    router.push(`/room/${code}`);
+  }
 
   return (
     <div className="pp">
@@ -79,9 +120,23 @@ export default function Home() {
             <h2>Start a pointing session</h2>
             <p className="pp-panel-sub">Deal a fresh table and invite your team.</p>
             <label>Your name</label>
-            <input type="text" placeholder="e.g. Aizat" maxLength={24} />
+            <input
+              type="text"
+              placeholder="e.g. Aizat"
+              maxLength={24}
+              value={createName}
+              onChange={(e) => setCreateName(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && startSession()}
+            />
             <label>Story or ticket (optional)</label>
-            <input type="text" placeholder="e.g. JIRA-482 Refund flow" maxLength={80} />
+            <input
+              type="text"
+              placeholder="e.g. JIRA-482 Refund flow"
+              maxLength={80}
+              value={createTitle}
+              onChange={(e) => setCreateTitle(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && startSession()}
+            />
             <label>Estimation deck</label>
             <select>
               <option value="fibonacci">Fibonacci — 0 1 2 3 5 8 13 21 34 55 89</option>
@@ -90,19 +145,37 @@ export default function Home() {
               <option value="sequential">Sequential — 1 to 10</option>
               <option value="tshirt">T-shirt sizes — XS S M L XL XXL</option>
             </select>
-            <button className="pp-btn pp-btn-primary">Deal me in →</button>
-            <p className="pp-error" />
+            <button className="pp-btn pp-btn-primary" onClick={startSession}>
+              Deal me in →
+            </button>
+            <p className="pp-error">{createError}</p>
           </div>
           <div className="pp-seam" />
           <div className="pp-panel">
             <h2>Join a session</h2>
             <p className="pp-panel-sub">Already got a table code from a teammate?</p>
             <label>Your name</label>
-            <input type="text" placeholder="e.g. Aizat" maxLength={24} />
+            <input
+              type="text"
+              placeholder="e.g. Aizat" maxLength={24}
+              value={joinName}
+              onChange={(e) => setJoinName(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && joinSession()}
+            />
             <label>Room code</label>
-            <input type="text" placeholder="e.g. 7F3KQ2" maxLength={8} style={{ textTransform: "uppercase" }} />
-            <button className="pp-btn pp-btn-outline">Join table →</button>
-            <p className="pp-error" />
+            <input
+              type="text"
+              placeholder="e.g. 7F3KQ2"
+              maxLength={8}
+              style={{ textTransform: "uppercase" }}
+              value={joinCode}
+              onChange={(e) => setJoinCode(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && joinSession()}
+              />
+            <button className="pp-btn pp-btn-outline" onClick={joinSession}>
+              Join table →
+            </button>
+            <p className="pp-error">{joinError}</p>
           </div>
         </div>
 

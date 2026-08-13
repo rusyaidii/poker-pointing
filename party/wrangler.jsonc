@@ -1,0 +1,11 @@
+{
+    "$schema": "../node_modules/wrangler/config-schema.json",
+    "name": "poker-party",
+    "main": "server.ts",
+    "compatibility_date": "2026-08-01",
+    "dev": { "port": 1999 },
+    "durable_objects": {
+        "bindings": [{ "name": "Room", "class_name": "Room" }]
+    },
+    "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Room"] }]
+}
