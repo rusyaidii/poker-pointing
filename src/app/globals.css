@@ -896,3 +896,116 @@ body {
     grid-template-columns: 1fr;
   }
 }
+
+/* ================= retro board (ported from prototype) ================= */
+.pp-retro-title {
+  padding: 28px 28px 0;
+  font-size: 22px;
+  max-width: 1120px;
+  margin: 0 auto;
+}
+.pp-retro-board {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  padding: 40px 28px 40px;
+  max-width: 1120px;
+  margin: 0 auto;
+}
+.pp-live-dot {
+  color: var(--ember);
+  animation: pp-pulse 1.5s infinite;
+}
+@keyframes pp-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+.pp-retro-col {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 13px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.pp-retro-col h3 {
+  font-size: 14.5px;
+}
+.pp-retro-compose {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.pp-retro-compose textarea {
+  resize: none;
+  min-height: 52px;
+  max-height: 200px;
+  font-size: 13.5px;
+  width: 100%;
+  padding: 11px 13px;
+  border-radius: 9px;
+  border: 1px solid var(--border);
+  background: var(--bg-panel-2);
+  color: var(--text);
+  outline: none;
+  field-sizing: content;
+}
+.pp-retro-compose textarea:focus {
+  border-color: var(--ember);
+}
+.pp-retro-compose button {
+  align-self: flex-end;
+  margin-top: 0;
+}
+.pp-retro-notes {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.pp-retro-note {
+  background: var(--bg-panel-2);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  padding: 10px 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+}
+.pp-retro-note-text {
+  font-size: 13.5px;
+  line-height: 1.45;
+}
+.pp-retro-note-author {
+  font-size: 11px;
+  color: var(--text-dim);
+  margin-top: 4px;
+}
+.pp-upvote {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 4px 8px;
+  color: var(--text);
+  flex-shrink: 0;
+  cursor: pointer;
+}
+.pp-upvote:hover {
+  border-color: var(--ember);
+}
+.pp-upvote-count {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 13px;
+}
+
+@media (max-width: 880px) {
+  .pp-retro-board {
+    grid-template-columns: 1fr;
+  }
+}

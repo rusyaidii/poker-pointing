@@ -42,6 +42,10 @@ export default function Home() {
   const [joinCode, setJoinCode] = useState("");
   const [joinError, setJoinError] = useState("");
 
+  const [retroName, setRetroName] = useState("");
+  const [retroJoinCode, setRetroJoinCode] = useState("");
+  const [retroError, setRetroError] = useState("");
+
   const toggleTheme = () => {
     const next = theme === "dark" ? "light" : "dark";
     setTheme(next);
@@ -74,6 +78,27 @@ export default function Home() {
     sessionStorage.removeItem("pp:deck");
     sessionStorage.removeItem("pp:story");
     router.push(`/room/${code}`);
+  }
+
+  const createRetro = () => {
+    if (!retroName.trim()) {
+      setRetroError("Enter your name to start a retro.");
+      return;
+    }
+
+    sessionStorage.setItem("pp:retroName", retroName.trim());
+    router.push(`/retro/${randCode()}`);
+  }
+
+  const joinRetro = () => {
+    const code = retroJoinCode.trim().toUpperCase();
+    if (!retroName.trim() || !code) {
+      setRetroError("Enter your name and room code to join a retro.");
+      return;
+    }
+
+    sessionStorage.setItem("pp:retroName", retroName.trim());
+    router.push(`/retro/${code}`);
   }
 
   return (
@@ -190,15 +215,26 @@ export default function Home() {
           </div>
           <div className="pp-retro-actions">
             <div className="flex flex-col gap-2">
-              <input type="text" placeholder="Your name" maxLength={24} />
-              <button className="pp-btn pp-btn-primary">Start a retro →</button>
+              <input
+                type="text"
+                placeholder="Your name"
+                maxLength={24}
+                value={retroName}
+                onChange={(e) => setRetroName(e.target.value)}
+              />
+              <button className="pp-btn pp-btn-primary" onClick={createRetro}>Start a retro →</button>
             </div>
             <div className="flex flex-col gap-2">
-              <input type="text" placeholder="Room code" maxLength={8} />
-              <button className="pp-btn pp-btn-outline">Join</button>
+              <input
+                type="text"
+                placeholder="Room code"
+                maxLength={8}
+                value={retroJoinCode}
+                onChange={(e) => setRetroJoinCode(e.target.value)}
+              />
+              <button className="pp-btn pp-btn-outline" onClick={joinRetro}>Join</button>
             </div>
-            
-            
+            <p className="pp-error" style={{ width: "100%" }}>{retroError}</p>
           </div>
         </div>
 

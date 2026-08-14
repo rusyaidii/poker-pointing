@@ -5,7 +5,13 @@
     "compatibility_date": "2026-08-01",
     "dev": { "port": 1999 },
     "durable_objects": {
-        "bindings": [{ "name": "Room", "class_name": "Room" }]
+        "bindings": [
+            { "name": "Room", "class_name": "Room" },
+            { "name": "Retro", "class_name": "Retro" }
+        ]
     },
-    "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Room"] }]
+    "migrations": [
+        { "tag": "v1", "new_sqlite_classes": ["Room"] },
+        { "tag": "v1", "new_sqlite_classes": ["Retro"] }
+    ]
 }

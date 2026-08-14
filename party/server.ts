@@ -47,8 +47,32 @@ type ClientMessage =
 	| { type: "setSpectator"; value: boolean }
 	| { type: "leave" };
 
+export type RetroColumn = "well" | "improve" | "action";
+
+export interface RetroNote {
+	id: string;
+	text: string;
+	votes: number;
+	author: string;
+	createdAt: number;
+}
+
+export interface RetroState {
+	code: string;
+	participants: Record<string, { name: string; joinedAt: number }>;
+	columns: Record<RetroColumn, RetroNote[]>;
+	createdAt: number;
+}
+
+type RetroMessage =
+	| { type: "join"; participantId: string; name: string; }
+	| { type: "addNote"; column: RetroColumn; text: string }
+	| { type: "upvote"; column: RetroColumn; id: string }
+	| { type: "leave" };
+
 interface Env extends Cloudflare.Env {
     Room: DurableObjectNamespace;
+	Retro: DurableObjectNamespace;
 }
 
 const ROOM_TTL_MS = 24 * 60 * 60 * 1000; // dead rooms self-clean after 24h
@@ -249,6 +273,98 @@ export class Room extends Server<Env> {
 			spread,
 			endedAt: Date.now(),
 		}
+	}
+}
+
+export class Retro extends Server<Env> {
+	static options = { hibernate: true }; // sleep while idle, keep sockets open = cheap
+
+	state!: RetroState;
+
+	async onStart() {
+		const saved = await this.ctx.storage.get<RetroState>("retro");
+		this.state = saved ?? {
+			code: this.name,
+			participants: {},
+			columns: {
+				well: [],
+				improve: [],
+				action: [],
+			},
+			createdAt: Date.now(),
+		}
+	}
+
+	async onConnect(conn: Connection) {
+		conn.send(JSON.stringify({ type: "state", retro: this.state }));
+	}
+
+	async onMessage(conn: Connection, raw: string | ArrayBuffer) {
+		if (typeof raw !== "string") return;
+		let msg: RetroMessage;
+		try {
+			msg = JSON.parse(raw);
+		} catch {
+			return;
+		}
+
+		const state = this.state;
+
+		switch (msg.type) {
+			case "join": {
+				state.participants[msg.participantId] = { name: msg.name, joinedAt: Date.now() };
+				conn.setState({ participantId: msg.participantId, name: msg.name });
+				break;
+			}
+
+			case "addNote": {
+				const text = msg.text.trim();
+				if (!text) break;
+				const author = (conn.state as { name?: string } | null)?.name ?? "";
+				state.columns[msg.column].push({
+					id: crypto.randomUUID(),
+					text,
+					votes: 0,
+					author,
+					createdAt: Date.now(),
+				});
+				break;
+			}
+
+			case "upvote": {
+				const note = state.columns[msg.column].find((n) => n.id === msg.id);
+				if (note) note.votes += 1;
+				break;
+			}
+
+			case "leave": {
+				const pid = (conn.state as { participantId?: string } | null)?.participantId ?? null;
+				if (pid) delete state.participants[pid];
+				break;
+			}
+		}
+
+		await this.save();
+		this.broadcast(JSON.stringify({ type: "state", retro: this.state }));
+	}
+
+	onClose(conn: Connection) {
+		const pid = (conn.state as { participantId?: string } | null)?.participantId;
+		if (!pid || !this.state) return;
+		delete this.state.participants[pid];
+		void this.save();
+		this.broadcast(JSON.stringify({ type: "state", retro: this.state }));
+	}
+
+	async onAlarm() {
+		if ([...this.getConnections()].length === 0) {
+			await this.ctx.storage.deleteAll();
+		}
+	}
+
+	private async save() {
+		await this.ctx.storage.put("retro", this.state);
+		await this.ctx.storage.setAlarm(Date.now() + ROOM_TTL_MS);
 	}
 }
 
