@@ -28,7 +28,7 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en" data-theme="dark">
-      <body className={`${display.variable} ${body.variable} ${mono.variable}`}>
+      <body className={`${display.variable} ${body.variable} ${mono.variable}`} cz-shortcut-listen="true">
         {children}
       </body>
     </html>
