@@ -4,6 +4,7 @@ import { randCode } from "@/lib/room";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { DeckType } from "../../party/server";
+import { roomExists } from "@/lib/party";
 
 const SunIcon = () => (
   <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round">
@@ -74,6 +75,12 @@ export default function Home() {
       return;
     }
 
+    setJoinError("");
+    if (!(await roomExists("room", code))) {
+      setJoinError("Room not found. Please check the code and try again.");
+      return;
+    }
+
     sessionStorage.setItem("pp:name", joinName.trim());
     sessionStorage.removeItem("pp:deck");
     sessionStorage.removeItem("pp:story");
@@ -90,10 +97,16 @@ export default function Home() {
     router.push(`/retro/${randCode()}`);
   }
 
-  const joinRetro = () => {
+  const joinRetro = async () => {
     const code = retroJoinCode.trim().toUpperCase();
     if (!retroName.trim() || !code) {
       setRetroError("Enter your name and room code to join a retro.");
+      return;
+    }
+
+    setRetroError("");
+    if (!(await roomExists("retro", code))) {
+      setRetroError("Retro not found. Please check the code and try again.");
       return;
     }
 

@@ -107,6 +107,14 @@ export class Room extends Server<Env> {
 		};
 	}
 
+	async onRequest(): Promise<Response> {
+		const saved = await this.ctx.storage.get<RoomState>("room");
+		return Response.json(
+			{ exists: !!saved },
+			{ headers: { "Access-Control-Allow-Origin": "*" } },
+		);
+	}
+
 	onConnect(conn: Connection) {
 		conn.send(JSON.stringify({ type: "state", room: this.state }));
 	}
@@ -293,6 +301,14 @@ export class Retro extends Server<Env> {
 			},
 			createdAt: Date.now(),
 		}
+	}
+
+	async onRequest(): Promise<Response> {
+		const saved = await this.ctx.storage.get<RetroState>("retro");
+		return Response.json(
+			{ exists: !!saved },
+			{ headers: { "Access-Control-Allow-Origin": "*" } },
+		);
 	}
 
 	async onConnect(conn: Connection) {

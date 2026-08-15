@@ -3,7 +3,7 @@
 import { use, useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { PartySocket } from "partysocket";
-import { PARTY_HOST } from "@/lib/party";
+import { PARTY_HOST, roomExists } from "@/lib/party";
 import { getOrCreatePid } from "@/lib/room";
 import { DeckType, type RoomState } from "../../../../party/server";
 import { computeStats, DECKS, numericValue, isNumericDeck, DECK_LABELS } from "@/lib/deck";
@@ -68,13 +68,30 @@ export default function RoomPage({ params }: { params: Promise<{ code: string }>
     const [elapsed, setElapsed] = useState("00:00");
     const [storyDraft, setStoryDraft] = useState("");
 
-    // Initialize the room
+    const [name, setName] = useState<string | null>(null);
+    const [gate, setGate] = useState<"checking" | "missing" | "prompt" | null>(null);
+    const [gateName, setGateName] = useState("");
+
+    // Resolve identity: creator or joiner already have a name
+    // invite-link visitors get validated and prompted for a name
     useEffect(() => {
-        const name = sessionStorage.getItem("pp:name");
-        if (!name) {
-            router.replace("/");
+        const existing = sessionStorage.getItem("pp:name");
+        if (existing) {
+            setName(existing);
             return;
         }
+
+        let cancelled = false;
+        setGate("checking");
+        roomExists("room", code).then((exists) => {
+            if (!cancelled) setGate(exists ? "prompt" : "missing");
+        });
+        return () => { cancelled = true; };
+    }, [code]);
+
+    // Initialize the room if we have a name
+    useEffect(() => {
+        if (!name) return;
 
         const participantId = getOrCreatePid();
         setMe(participantId);
@@ -97,7 +114,7 @@ export default function RoomPage({ params }: { params: Promise<{ code: string }>
         });
         
         return () => ps.close();
-    }, [code, router]);
+    }, [code, name]);
 
     const send = useCallback((data: unknown) => socketRef.current?.send(JSON.stringify(data)), []);
 
@@ -155,6 +172,15 @@ export default function RoomPage({ params }: { params: Promise<{ code: string }>
         document.documentElement.dataset.theme = next;
     };
 
+    const submitName = () => {
+        const n = gateName.trim();
+        if (!n) return;
+        sessionStorage.setItem("pp:name", n);
+        sessionStorage.removeItem("pp:deck"); // a link-joiner never seeds the deck or story
+        sessionStorage.removeItem("pp:story");
+        setName(n);
+    }
+
     // Flash the copied state for 1.5 seconds.
     const flashCopied = () => {
         setCopied(true);
@@ -185,6 +211,62 @@ export default function RoomPage({ params }: { params: Promise<{ code: string }>
         navigator.clipboard?.writeText(lines.join("\n"));
         flashCopied();
     };
+
+    if (!name) {
+        return (
+            <div className="pp">
+                <div className="pp-topbar">
+                    <div className="pp-brand">
+                        <span className="pp-brand-suit">♠</span>Pointing Poker
+                    </div>
+                </div>
+
+                <div className="pp-gate">
+                    {gate === "missing" ? (
+                        <div className="pp-gate-card">
+                            <h2>Table not found</h2>
+                            <p className="pp-panel-sub">
+                                There&apos;s no active table with code <strong>{code}</strong>. Double check
+                                the link, or start a fresh session.
+                            </p>
+                            <button className="pp-btn pp-btn-primary" onClick={() => router.push("/")}>
+                                Back to Home →
+                            </button>
+                        </div>
+                    ): gate === "prompt" ? (
+                        <div className="pp-gate-card">
+                            <div className="pp-gate-code">
+                                <span className="pp-room-label">Joining table</span>
+                                <span className="pp-room-code">{code}</span>
+                            </div>
+
+                            <h2>What should we call you?</h2>
+                            <p className="pp-panel-sub">Your teammates will see this name at the table.</p>
+                            <label>Your name</label>
+                            <input
+                                type="text"
+                                placeholder="e.g. Aizat"
+                                maxLength={24}
+                                autoFocus
+                                value={gateName}
+                                onChange={(e) => setGateName(e.target.value)}
+                                onKeyDown={(e) => e.key === "Enter" && submitName()}
+                            />
+                            <button
+                                className="pp-btn pp-btn-primary"
+                                onClick={submitName}
+                                disabled={!gateName.trim()}
+                            >
+                                Join Table →
+                            </button>
+                        </div>
+                    ) : (
+                        <p className="pp-empty">Checking table...</p>
+                    )}
+                </div>
+            </div>
+        )
+    }
 
     if (!room) {
         return (
@@ -381,7 +463,7 @@ export default function RoomPage({ params }: { params: Promise<{ code: string }>
                 </div>
 
                 <aside className="pp-history-panel">
-                        <div className="-pp-history-head">
+                        <div className="pp-history-head">
                             <h3>Round history</h3>
                             <button className="pp-icon-btn" onClick={exportHistory} title="Export history">
                                 <DownloadIcon />

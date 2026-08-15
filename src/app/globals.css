@@ -511,6 +511,38 @@ body {
   }
 }
 
+/* ================= invite-link name gate ================= */
+.pp-gate {
+  min-height: calc(100vh - 130px);
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+.pp-gate-card {
+  width: 100%;
+  max-width: 420px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  padding: 32px 34px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.pp-gate-card h2 {
+  font-size: 22px;
+  margin-bottom: 4px;
+}
+.pp-gate-card .pp-btn {
+  margin-top: 16px;
+}
+.pp-gate-code {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
 /* ================= pointing room (ported from prototype) ================= */
 .pp-room-bar {
   display: flex;
