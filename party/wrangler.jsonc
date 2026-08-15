@@ -12,6 +12,6 @@
     },
     "migrations": [
         { "tag": "v1", "new_sqlite_classes": ["Room"] },
-        { "tag": "v1", "new_sqlite_classes": ["Retro"] }
+        { "tag": "v2", "new_sqlite_classes": ["Retro"] }
     ]
 }
