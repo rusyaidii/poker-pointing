@@ -13,7 +13,8 @@
     "preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
     "cf-typegen": "wrangler types --env-interface CloudflareEnv ./cloudflare-env.d.ts",
     "party:dev": "wrangler dev -c party/wrangler.jsonc",
-    "party:deploy": "wrangler deploy -c party/wrangler.jsonc"
+    "party:deploy": "wrangler deploy -c party/wrangler.jsonc",
+    "party:delete": "wrangler delete -c party/wrangler.jsonc"
   },
   "dependencies": {
     "@opennextjs/cloudflare": "^1.19.9",

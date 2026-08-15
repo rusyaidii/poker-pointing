@@ -3,7 +3,7 @@
 import { use, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { PartySocket } from "partysocket";
-import { PARTY_HOST } from "@/lib/party";
+import { PARTY_HOST, roomExists } from "@/lib/party";
 import { getOrCreatePid } from "@/lib/room";
 import { type RetroState, type RetroColumn } from "../../../../party/server";
 
@@ -28,13 +28,27 @@ export default function RetroPage({ params }: { params: Promise<{ code: string }
     const [connected, setConnected] = useState(false);
     const [copied, setCopied] = useState(false);
     const [drafts, setDrafts] = useState<Record<RetroColumn, string>>({ well: "", improve: "", action: "" });
+    const [name, setName] = useState<string | null>(null);
+    const [gate, setGate] = useState<"checking" | "missing" | "prompt" | null>(null);
+    const [gateName, setGateName] = useState("");
 
     useEffect(() => {
-        const name = sessionStorage.getItem("pp:retroName");
-        if (!name) {
-            router.replace("/");
+        const existing = sessionStorage.getItem("pp:retroName");
+        if (existing) {
+            setName(existing);
             return;
         }
+
+        let cancelled = false;
+        setGate("checking");
+        roomExists("retro",code).then((exist) => {
+            if (!cancelled) setGate(exist ? "prompt" : "missing");
+        })
+        return () => { cancelled = true };
+    }, [code]);
+
+    useEffect(() => {
+        if (!name) return;
 
         const participantId = getOrCreatePid();
 
@@ -54,7 +68,7 @@ export default function RetroPage({ params }: { params: Promise<{ code: string }
         });
 
         return () => ps.close();
-    }, [code, router]);
+    }, [code, name]);
 
     const send = (data: unknown) => socketRef.current?.send(JSON.stringify(data));
     const copyInvite = () => {
@@ -74,6 +88,68 @@ export default function RetroPage({ params }: { params: Promise<{ code: string }
         if (!text) return;
         send({ type: "addNote", column, text });
         setDrafts((prev) => ({ ...prev, [column]: "" }));
+    }
+
+    const submitName = () => {
+        const n = gateName.trim();
+        if (!n) return;
+        sessionStorage.setItem("pp:retroName", n);
+        setName(n);
+    }
+
+    if (!name) {
+        return (
+            <div className="pp">
+                <div className="pp-topbar">
+                    <div className="pp-brand">
+                        <span className="pp-brand-suit">♠</span>Pointing Poker
+                    </div>
+                </div>
+    
+                <div className="pp-gate">
+                    {gate === "missing" ? (
+                        <div className="pp-gate-card">
+                            <h2>Table not found</h2>
+                            <p className="pp-panel-sub">
+                                There&apos;s no active retro with code <strong>{code}</strong>. Double-check
+                                the link, or start a fresh session.
+                            </p>
+                            <button className="pp-btn pp-btn-primary" onClick={() => router.push("/")}>
+                                Back to home →
+                            </button>
+                        </div>
+                    ) : gate === "prompt" ? (
+                        <div className="pp-gate-card">
+                            <div className="pp-gate-code">
+                                <span className="pp-room-label">Joining retro</span>
+                                <span className="pp-room-code">{code}</span>
+                            </div>
+                            <h2>What should we call you?</h2>
+                            <p className="pp-panel-sub">Your teammates will see this name at the retro.</p>
+                            <label>Your name</label>
+                            <input
+                                type="text"
+                                placeholder="e.g. Aizat"
+                                maxLength={24}
+                                autoFocus
+                                value={gateName}
+                                onChange={(e) => setGateName(e.target.value)}
+                                onKeyDown={(e) => e.key === "Enter" && submitName()}
+                            />
+                            <button
+                                className="pp-btn pp-btn-primary"
+                                onClick={submitName}
+                                disabled={!gateName.trim()}
+                            >
+                                Join retro →
+                            </button>
+                        </div>
+                    ) : (
+                        <p className="pp-empty">Checking retro...</p>
+                    )}
+                </div>
+            </div>
+        );
     }
 
     if (!retro) {
