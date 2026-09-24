@@ -23,7 +23,7 @@ export const DECK_LABELS: Record<DeckType, string> = {
  * @returns The numeric value, or null if the value is not a number.
  */
 export function numericValue(v: string): number | null {
-    if (v === "%") return 0.5;
+    if (v === "½") return 0.5;
     const n = parseFloat(v);
     return isNaN(n) ? null : n;
 }

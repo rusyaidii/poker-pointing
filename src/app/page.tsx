@@ -3,7 +3,7 @@
 import { randCode } from "@/lib/room";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { DeckType } from "../../party/server";
+import type { DeckType, RoomLayout } from "../../party/server";
 import { roomExists } from "@/lib/party";
 
 const SunIcon = () => (
@@ -37,6 +37,7 @@ export default function Home() {
   const [createName, setCreateName] = useState("");
   const [createTitle, setCreateTitle] = useState("");
   const [createDeck, setCreateDeck] = useState<DeckType>("fibonacci");
+  const [createLayout, setCreateLayout] = useState<RoomLayout>("table");
   const [createError, setCreateError] = useState("");
 
   const [joinName, setJoinName] = useState("");
@@ -61,6 +62,7 @@ export default function Home() {
 
     sessionStorage.setItem("pp:name", createName.trim());
     sessionStorage.setItem("pp:deck", createDeck);
+    sessionStorage.setItem("pp:layout", createLayout);
 
     if (createTitle.trim()) sessionStorage.setItem("pp:story", createTitle.trim());
     else sessionStorage.removeItem("pp:story");
@@ -84,6 +86,7 @@ export default function Home() {
     sessionStorage.setItem("pp:name", joinName.trim());
     sessionStorage.removeItem("pp:deck");
     sessionStorage.removeItem("pp:story");
+    sessionStorage.removeItem("pp:layout");
     router.push(`/room/${code}`);
   }
 
@@ -176,13 +179,28 @@ export default function Home() {
               onKeyDown={(e) => e.key === "Enter" && startSession()}
             />
             <label>Estimation deck</label>
-            <select>
+            <select value={createDeck} onChange={(e) => setCreateDeck(e.target.value as DeckType)}>
               <option value="fibonacci">Fibonacci — 0 1 2 3 5 8 13 21 34 55 89</option>
               <option value="modified">Modified Fibonacci — 0 ½ 1 2 3 5 8 13 20 40 100</option>
               <option value="powers2">Powers of 2 — 0 1 2 4 8 16 32 64</option>
               <option value="sequential">Sequential — 1 to 10</option>
               <option value="tshirt">T-shirt sizes — XS S M L XL XXL</option>
             </select>
+            <label>Room type</label>
+            <div className="pp-segmented" role="radiogroup" aria-label="Room type">
+              {([["table", "Poker table"], ["normal", "Normal"]] as const).map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  role="radio"
+                  aria-checked={createLayout === value}
+                  className={createLayout === value ? "pp-active" : ""}
+                  onClick={() => setCreateLayout(value)}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
             <button className="pp-btn pp-btn-primary" onClick={startSession}>
               Deal me in →
             </button>

@@ -7,6 +7,8 @@ export type DeckType =
     | "sequential"
 	| "tshirt";
 
+export type RoomLayout = "table" | "normal";
+
 export interface Participant {
 	name: string;
 	isSpectator: boolean;
@@ -25,6 +27,7 @@ export interface HistoryEntry {
 export interface RoomState {
 	code: string;
 	deckType: DeckType;
+	layout: RoomLayout;
 	storyTitle: string;
 	revealed: boolean;
 	autoReveal: boolean;
@@ -37,7 +40,7 @@ export interface RoomState {
 }
 
 type ClientMessage =
-	| { type: "join"; participantId: string; name: string; isSpectator?: boolean; initDeck?: DeckType; initStory?: string }
+	| { type: "join"; participantId: string; name: string; isSpectator?: boolean; initDeck?: DeckType; initStory?: string; initLayout?: RoomLayout }
 	| { type: "vote"; value: string }
 	| { type: "reveal" }
 	| { type: "newRound" }
@@ -45,6 +48,7 @@ type ClientMessage =
 	| { type: "setDeck"; deckType: DeckType }
 	| { type: "setAutoReveal"; value: boolean }
 	| { type: "setSpectator"; value: boolean }
+	| { type: "setLayout"; value: RoomLayout }
 	| { type: "leave" };
 
 export type RetroColumn = "well" | "improve" | "action";
@@ -57,17 +61,35 @@ export interface RetroNote {
 	createdAt: number;
 }
 
+export interface RetroTimer {
+	running: boolean;
+	endsAt: number | null;
+	remainingMs: number;
+	durationMs: number;
+}
+
 export interface RetroState {
 	code: string;
 	participants: Record<string, { name: string; joinedAt: number }>;
 	columns: Record<RetroColumn, RetroNote[]>;
+	timer: RetroTimer;
 	createdAt: number;
+}
+
+const DEFAULT_TIMER: RetroTimer = {
+	running: false,
+	endsAt: null,
+	remainingMs: 0,
+	durationMs: 5 * 60 * 1000, // 5 minutes
 }
 
 type RetroMessage =
 	| { type: "join"; participantId: string; name: string; }
 	| { type: "addNote"; column: RetroColumn; text: string }
 	| { type: "upvote"; column: RetroColumn; id: string }
+	| { type: "startTimer"; durationMs?: number }
+	| { type: "pauseTimer" }
+	| { type: "resetTimer" }
 	| { type: "leave" };
 
 interface Env extends Cloudflare.Env {
@@ -95,6 +117,7 @@ export class Room extends Server<Env> {
 		this.state = saved ?? {
 			code: this.name,
 			deckType: "fibonacci",
+			layout: "table",
 			storyTitle: "What are we estimating?",
 			revealed: false,
 			autoReveal: true,
@@ -137,6 +160,7 @@ export class Room extends Server<Env> {
 				if (isCreator) {
 					if (msg.initDeck) state.deckType = msg.initDeck;
 					if (msg.initStory) state.storyTitle = msg.initStory;
+					if (msg.initLayout === "table" || msg.initLayout === "normal") state.layout = msg.initLayout;
 				}
 
 				// Add participant to participants map
@@ -202,6 +226,11 @@ export class Room extends Server<Env> {
 
 			case "setAutoReveal": {
 				state.autoReveal = msg.value;
+				break;
+			}
+
+			case "setLayout": {
+				if (msg.value === "table" || msg.value === "normal") state.layout = msg.value;
 				break;
 			}
 
@@ -299,6 +328,7 @@ export class Retro extends Server<Env> {
 				improve: [],
 				action: [],
 			},
+			timer: { ...DEFAULT_TIMER },
 			createdAt: Date.now(),
 		}
 	}
@@ -350,6 +380,45 @@ export class Retro extends Server<Env> {
 			case "upvote": {
 				const note = state.columns[msg.column].find((n) => n.id === msg.id);
 				if (note) note.votes += 1;
+				break;
+			}
+
+			case "startTimer": {
+				const t = state.timer;
+			
+				// Start a new duration if one was provided.
+				if (typeof msg.durationMs === "number" && msg.durationMs > 0) {
+					t.durationMs = msg.durationMs;
+					t.remainingMs = msg.durationMs;
+				}
+			
+				// Resume from remaining time, or start from the full duration.
+				const base = t.remainingMs > 0 ? t.remainingMs : t.durationMs;
+			
+				if (base <= 0) return;
+			
+				t.remainingMs = base;
+				t.endsAt = Date.now() + base;
+				t.running = true;
+			
+				break;
+			}
+
+			case "pauseTimer": {
+				const t = state.timer;
+				if (t.running && t.endsAt) {
+					t.remainingMs = Math.max(0, t.endsAt - Date.now());
+					t.running = false;
+					t.endsAt = null;
+				}
+				break;
+			}
+
+			case "resetTimer": {
+				const t = state.timer;
+				t.running = false;
+				t.endsAt = null;
+				t.remainingMs = t.durationMs;
 				break;
 			}
 

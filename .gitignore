@@ -48,5 +48,7 @@ next-env.d.ts
 .wrangler
 .dev.vars*
 
+.claude/
+
 
 !.dev.vars.example
