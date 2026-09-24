@@ -1364,6 +1364,118 @@ body {
   color: var(--gold);
   flex-shrink: 0;
 }
+.pp-ledger-summary {
+  margin-top: 2px;
+  font-size: 11.5px;
+  color: var(--text-dim);
+  font-family: var(--font-mono);
+}
+.pp-icon-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  transform: none;
+  border-color: var(--border);
+}
+
+/* export menu */
+.pp-export {
+  position: relative;
+}
+.pp-export-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 20;
+  min-width: 180px;
+  padding: 5px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.25);
+  display: flex;
+  flex-direction: column;
+}
+.pp-export-menu button {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 10px;
+  border-radius: 7px;
+  font-size: 13px;
+  color: var(--text);
+  text-align: left;
+}
+.pp-export-menu button:hover,
+.pp-export-menu button:focus-visible {
+  background: var(--bg);
+  color: var(--ember);
+}
+.pp-export-menu svg {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+/* expandable ledger rows */
+.pp-ledger-item {
+  border-bottom: 1px solid var(--border);
+}
+.pp-ledger-item:last-child {
+  border-bottom: none;
+}
+.pp-ledger-item > summary.pp-ledger-row {
+  border-bottom: none;
+  cursor: pointer;
+  list-style: none;
+}
+.pp-ledger-item > summary::-webkit-details-marker {
+  display: none;
+}
+.pp-ledger-item > summary .pp-ledger-title::before {
+  content: "▸";
+  display: inline-block;
+  width: 12px;
+  color: var(--text-dim);
+  transition: transform 0.15s;
+}
+.pp-ledger-item[open] > summary .pp-ledger-title::before {
+  transform: rotate(90deg);
+}
+.pp-ledger-item > summary:hover .pp-ledger-title {
+  color: var(--ember);
+}
+.pp-ledger-votes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 0 0 10px 12px;
+}
+.pp-vote-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 11.5px;
+  color: var(--text-dim);
+}
+.pp-vote-chip strong {
+  font-family: var(--font-mono);
+  color: var(--text);
+}
+.pp-vote-chip.pp-outlier-high {
+  border-color: var(--ember);
+}
+.pp-vote-chip.pp-outlier-high strong {
+  color: var(--ember);
+}
+.pp-vote-chip.pp-outlier-low {
+  border-color: var(--outlier-low);
+}
+.pp-vote-chip.pp-outlier-low strong {
+  color: var(--outlier-low);
+}
 
 @keyframes pp-blink {
   0%,

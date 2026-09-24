@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { PartySocket } from "partysocket";
 import { PARTY_HOST, roomExists } from "@/lib/party";
 import { getOrCreatePid } from "@/lib/room";
-import type { DeckType, RoomLayout, RoomState } from "../../../../party/server";
+import type { DeckType, HistoryEntry, RoomLayout, RoomState } from "../../../../party/server";
 import { computeStats, DECKS, numericValue, isNumericDeck, DECK_LABELS } from "@/lib/deck";
 
 const SunIcon = () => (
@@ -57,6 +57,118 @@ const fmt = (n: number | null) => (n === null ? "—" : Number.isInteger(n) ? St
 
 const LAYOUTS: [RoomLayout, string][] = [["table", "Poker table"], ["normal", "Normal"]];
 
+type LedgerRow = HistoryEntry & { live?: boolean };
+
+// Newest first. A revealed-but-not-yet-reset round is included as `live`,
+// since it only lands in history once the next round starts.
+function ledgerRows(room: RoomState): LedgerRow[] {
+    const rows: LedgerRow[] = [...room.history];
+    if (room.revealed && Object.keys(room.votes).length > 0) {
+        const s = computeStats(room);
+        rows.unshift({
+            round: room.round,
+            title: room.storyTitle,
+            average: s.average,
+            consensus: s.consensus,
+            spread: s.min !== null && s.max !== null ? `${s.min} - ${s.max}` : "",
+            endedAt: Date.now(),
+            votes: Object.entries(room.votes).map(([pid, value]) => ({
+                name: room.participants[pid]?.name ?? "Unknown",
+                value,
+            })),
+            live: true,
+        });
+    }
+    return rows;
+}
+
+function ledgerSummary(rows: LedgerRow[], numeric: boolean): string {
+    const parts = [`${rows.length} round${rows.length === 1 ? "" : "s"}`];
+    parts.push(`${rows.filter((r) => r.consensus).length} consensus`);
+    if (numeric) {
+        const total = rows.reduce((sum, r) => sum + (r.average ?? 0), 0);
+        if (total > 0) parts.push(`${fmt(Math.round(total * 10) / 10)} pts total`);
+    }
+    return parts.join(" · ");
+}
+
+const votesText = (r: LedgerRow) => (r.votes ?? []).map((v) => `${v.name}: ${v.value}`).join("; ");
+
+function toCsv(rows: LedgerRow[]): string {
+    const cell = (v: string | number) => {
+        const str = String(v);
+        return /[",\r\n]/.test(str) ? `"${str.replace(/"/g, '""')}"` : str;
+    };
+    const header = ["Round", "Story", "Average", "Spread", "Consensus", "Votes", "Ended at"];
+    const lines = [...rows].reverse().map((r) =>
+        [
+            r.round,
+            r.title,
+            r.average !== null ? r.average.toFixed(1) : "",
+            r.spread,
+            r.consensus ? "yes" : "no",
+            votesText(r),
+            new Date(r.endedAt).toISOString(),
+        ].map(cell).join(",")
+    );
+    return [header.join(","), ...lines].join("\r\n");
+}
+
+function toMarkdown(rows: LedgerRow[], room: RoomState): string {
+    const esc = (s: string) => s.replace(/\|/g, "\\|").replace(/\r?\n/g, " ");
+    const lines = [
+        `**Pointing Poker — room ${room.code}** (${ledgerSummary(rows, isNumericDeck(room.deckType))})`,
+        "",
+        "| Round | Story | Result | Votes |",
+        "| --- | --- | --- | --- |",
+    ];
+    [...rows].reverse().forEach((r) => {
+        const result = r.consensus
+            ? `✅ consensus${r.average !== null ? ` · ${fmt(r.average)}` : ""}`
+            : r.average !== null
+                ? `avg ${r.average.toFixed(1)}${r.spread ? ` (${r.spread})` : ""}`
+                : "mixed votes";
+        lines.push(`| ${r.round} | ${esc(r.title)} | ${result} | ${esc(votesText(r)) || "—"} |`);
+    });
+    return lines.join("\n");
+}
+
+// Clipboard API needs a secure context; fall back to execCommand on plain-HTTP LAN addresses.
+async function copyText(text: string): Promise<boolean> {
+    try {
+        if (navigator.clipboard && window.isSecureContext) {
+            await navigator.clipboard.writeText(text);
+            return true;
+        }
+    } catch {
+        // fall through to the legacy path
+    }
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.style.position = "fixed";
+    ta.style.opacity = "0";
+    document.body.appendChild(ta);
+    ta.select();
+    const ok = document.execCommand("copy");
+    ta.remove();
+    return ok;
+}
+
+// Votes sorted low → high; the ends of a split vote are flagged as outliers to discuss.
+function voteChips(r: LedgerRow) {
+    const votes = [...(r.votes ?? [])];
+    const nums = votes.map((v) => numericValue(v.value)).filter((n): n is number => n !== null);
+    const min = nums.length ? Math.min(...nums) : null;
+    const max = nums.length ? Math.max(...nums) : null;
+    votes.sort((a, b) => (numericValue(a.value) ?? Infinity) - (numericValue(b.value) ?? Infinity));
+    return votes.map((v) => {
+        const n = numericValue(v.value);
+        const split = !r.consensus && min !== max && n !== null;
+        const outlier = split && n === max ? "high" : split && n === min ? "low" : null;
+        return { ...v, outlier };
+    });
+}
+
 function fireConfetti(layer: HTMLDivElement | null) {
     if (!layer) return;
 
@@ -90,6 +202,9 @@ export default function RoomPage({ params }: { params: Promise<{ code: string }>
     const [me, setMe] = useState("");
     const [theme, setTheme] = useState<"light" | "dark">("dark");
     const [copied, setCopied] = useState(false);
+    const [exported, setExported] = useState<"csv" | "md" | null>(null);
+    const [exportOpen, setExportOpen] = useState(false);
+    const exportMenuRef = useRef<HTMLDivElement | null>(null);
     const [elapsed, setElapsed] = useState("00:00");
     const [storyDraft, setStoryDraft] = useState("");
 
@@ -214,9 +329,8 @@ export default function RoomPage({ params }: { params: Promise<{ code: string }>
         setTimeout(() => setCopied(false), 1500);
     }
 
-    const copyInvite = () => {
-        navigator.clipboard?.writeText(`${location.origin}/room/${code}`);
-        flashCopied();
+    const copyInvite = async () => {
+        if (await copyText(`${location.origin}/room/${code}`)) flashCopied();
     }
 
     const leave = () => {
@@ -225,19 +339,52 @@ export default function RoomPage({ params }: { params: Promise<{ code: string }>
         router.push("/");
     }
 
-    const exportHistory = () => {
-        if (!room) return;
-        const lines = [`Pointing Poker — room ${room.code}`, ""];
-        [...room.history].reverse().forEach((h) => {
-            const bits: string[] = [];
-            if (isNumericDeck(room.deckType) && h.average !== null) bits.push(`avg ${h.average.toFixed(1)}`);
-            if (h.consensus) bits.push("consensus ✅");
-            lines.push(`Round ${h.round} — ${h.title}: ${bits.join(", ") || "mixed votes"}`);
-        });
-
-        navigator.clipboard?.writeText(lines.join("\n"));
-        flashCopied();
+    const flashExported = (kind: "csv" | "md") => {
+        setExported(kind);
+        setTimeout(() => setExported(null), 1500);
     };
+
+    const downloadCsv = () => {
+        setExportOpen(false);
+        if (!room) return;
+        const rows = ledgerRows(room);
+        if (rows.length === 0) return;
+
+        // BOM so Excel reads the UTF-8 story titles correctly.
+        const blob = new Blob(["﻿" + toCsv(rows)], { type: "text/csv;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `pointing-poker-${room.code}-${new Date().toISOString().slice(0, 10)}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+        flashExported("csv");
+    };
+
+    const copyMarkdown = async () => {
+        setExportOpen(false);
+        if (!room) return;
+        const rows = ledgerRows(room);
+        if (rows.length === 0) return;
+        if (await copyText(toMarkdown(rows, room))) flashExported("md");
+    };
+
+    // Close the export menu on outside click or Escape.
+    useEffect(() => {
+        if (!exportOpen) return;
+        const onDown = (e: MouseEvent) => {
+            if (!exportMenuRef.current?.contains(e.target as Node)) setExportOpen(false);
+        };
+        const onKey = (e: KeyboardEvent) => e.key === "Escape" && setExportOpen(false);
+        document.addEventListener("mousedown", onDown);
+        document.addEventListener("keydown", onKey);
+        return () => {
+            document.removeEventListener("mousedown", onDown);
+            document.removeEventListener("keydown", onKey);
+        };
+    }, [exportOpen]);
 
     if (!name) {
         return (
@@ -308,6 +455,7 @@ export default function RoomPage({ params }: { params: Promise<{ code: string }>
     const myVote = room.votes[me];
     const cards = DECKS[room.deckType] ?? DECKS.fibonacci;
     const stats = room.revealed && Object.keys(room.votes).length > 0 ? computeStats(room) : null;
+    const ledger = ledgerRows(room);
     const players = participants.filter(([, p]) => !p.isSpectator);
     const votedCount = players.filter(([pid]) => pid in room.votes).length;
 
@@ -658,36 +806,89 @@ export default function RoomPage({ params }: { params: Promise<{ code: string }>
 
                     <aside className="pp-ledger">
                         <div className="pp-ledger-head">
-                            <h3>Round ledger</h3>
-                            <button className="pp-icon-btn" onClick={exportHistory} title="Copy history">
-                                <DownloadIcon />
-                            </button>
+                            <div>
+                                <h3>Round ledger</h3>
+                                {ledger.length > 0 && (
+                                    <div className="pp-ledger-summary">
+                                        {ledgerSummary(ledger, isNumericDeck(room.deckType))}
+                                    </div>
+                                )}
+                            </div>
+                            <div className="pp-export" ref={exportMenuRef}>
+                                <button
+                                    className="pp-icon-btn"
+                                    onClick={() => setExportOpen((o) => !o)}
+                                    disabled={ledger.length === 0}
+                                    title={exported === "csv" ? "Downloaded" : exported === "md" ? "Copied" : "Export history"}
+                                    aria-label="Export round history"
+                                    aria-haspopup="menu"
+                                    aria-expanded={exportOpen}
+                                >
+                                    {exported ? <CheckIcon /> : <DownloadIcon />}
+                                </button>
+                                {exportOpen && (
+                                    <div className="pp-export-menu" role="menu">
+                                        <button role="menuitem" onClick={downloadCsv}>
+                                            <DownloadIcon /> Download CSV
+                                        </button>
+                                        <button role="menuitem" onClick={copyMarkdown}>
+                                            <CopyIcon /> Copy as Markdown
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
                         </div>
 
                         <div className="pp-ledger-list">
-                            <div className="pp-ledger-row">
-                                <div>
-                                    <div className="pp-ledger-title">Round {room.round} · {room.storyTitle}</div>
-                                    <div className="pp-ledger-meta">{room.revealed ? "revealed" : "in progress…"}</div>
-                                </div>
-                                {!room.revealed && <span className="pp-ledger-live" />}
-                            </div>
-
-                            {room.history?.map((h, i) => (
-                                <div className="pp-ledger-row" key={i}>
+                            {!room.revealed && (
+                                <div className="pp-ledger-row">
                                     <div>
-                                        <div className="pp-ledger-title">Round {h.round} · {h.title}</div>
-                                        <div className={`pp-ledger-meta${h.consensus ? " pp-gold" : ""}`}>
-                                            {h.consensus
-                                                ? `consensus${h.average !== null ? ` · ${fmt(h.average)}` : ""}`
-                                                : h.average !== null
-                                                    ? `avg ${h.average.toFixed(1)}${h.spread ? ` · ${h.spread}` : ""}`
-                                                    : "mixed votes"}
-                                        </div>
+                                        <div className="pp-ledger-title">Round {room.round} · {room.storyTitle}</div>
+                                        <div className="pp-ledger-meta">in progress…</div>
                                     </div>
-                                    {h.consensus && <span className="pp-ledger-star">★</span>}
+                                    <span className="pp-ledger-live" />
                                 </div>
-                            ))}
+                            )}
+
+                            {ledger.map((h) => {
+                                const chips = voteChips(h);
+                                const head = (
+                                    <>
+                                        <div>
+                                            <div className="pp-ledger-title">Round {h.round} · {h.title}</div>
+                                            <div className={`pp-ledger-meta${h.consensus ? " pp-gold" : ""}`}>
+                                                {h.live && "revealed · "}
+                                                {h.consensus
+                                                    ? `consensus${h.average !== null ? ` · ${fmt(h.average)}` : ""}`
+                                                    : h.average !== null
+                                                        ? `avg ${h.average.toFixed(1)}${h.spread ? ` · ${h.spread}` : ""}`
+                                                        : "mixed votes"}
+                                            </div>
+                                        </div>
+                                        {h.consensus && <span className="pp-ledger-star">★</span>}
+                                    </>
+                                );
+                                // Rounds saved before votes were recorded have nothing to expand.
+                                if (chips.length === 0) {
+                                    return <div className="pp-ledger-row" key={h.round}>{head}</div>;
+                                }
+                                return (
+                                    <details className="pp-ledger-item" key={h.round}>
+                                        <summary className="pp-ledger-row">{head}</summary>
+                                        <div className="pp-ledger-votes">
+                                            {chips.map((v, i) => (
+                                                <span
+                                                    key={i}
+                                                    className={`pp-vote-chip${v.outlier ? ` pp-outlier-${v.outlier}` : ""}`}
+                                                    title={v.outlier ? `${v.outlier === "high" ? "Highest" : "Lowest"} vote — worth a quick chat` : undefined}
+                                                >
+                                                    {v.name}<strong>{v.value}</strong>
+                                                </span>
+                                            ))}
+                                        </div>
+                                    </details>
+                                );
+                            })}
                         </div>
                     </aside>
                 </div>

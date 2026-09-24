@@ -22,6 +22,7 @@ export interface HistoryEntry {
 	consensus: boolean;
 	spread: string;
 	endedAt: number;
+	votes?: { name: string; value: string }[]; // optional: rounds saved before this field existed lack it
 }
 
 export interface RoomState {
@@ -309,6 +310,10 @@ export class Room extends Server<Env> {
 			consensus,
 			spread,
 			endedAt: Date.now(),
+			votes: Object.entries(state.votes).map(([pid, value]) => ({
+				name: state.participants[pid]?.name ?? "Unknown",
+				value,
+			})),
 		}
 	}
 }
